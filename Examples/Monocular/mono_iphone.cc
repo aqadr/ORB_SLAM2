@@ -31,10 +31,88 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <dirent.h>
+#include <sys/types.h>
 using namespace std;
 
-void LoadImages(const string &strSequence, vector<string> &vstrImageFilenames,
-                vector<double> &vTimestamps);
+//! \brief get file extension
+string getFileExt(const string& s)
+{
+   size_t i = s.rfind('.', s.length());
+   if (i != string::npos)
+   {
+      return(s.substr(i+1, s.length() - i));
+   }
+
+   return("");
+}
+
+string getFrameNumber(const string& s)
+{
+     size_t i = s.rfind('.', s.length());
+     if (i != string::npos)
+     {
+        return(s.substr(5,i-5));
+     }
+}
+
+
+std::vector<std::string>imagePathsVec;
+
+std::vector<cv::Mat> imageVec;
+void LoadImages(const string &strSequence, std::vector<string> &vstrImageFilenames)
+{
+
+    std::vector<std::string> imageNameVec;
+    struct dirent *entry;
+    DIR *dir = opendir(strSequence.c_str());
+
+    if (dir == NULL) {
+        return;
+    }
+    int cnt=0;
+    while ((entry = readdir(dir)) != NULL)
+    {
+        cout << entry->d_name << endl;
+        std::string s(entry->d_name);
+        string ext=getFileExt(s);
+
+        if(ext=="png")
+        {
+            ++cnt;
+            string output=strSequence+"/"+s;
+            std::cout<<"print path: "<<output<<std::endl;
+            imageNameVec.push_back(s);
+        }
+    }
+
+    std::cout<<"checdk cnt:"<<cnt<<std::endl;
+    if(cnt<=0)
+        return;
+
+    vstrImageFilenames=std::vector<std::string>(cnt);
+    for (int i=0;i<cnt;++i)
+    {
+        std::string s=imageNameVec.at(i);
+        string frameNum=getFrameNumber(s);
+        string output=strSequence+"/"+s;
+        std::cout<<"print path: "<<output<<std::endl;
+        std::cout<<"frame number: "<<frameNum<<std::endl;
+        int frameInt=std::atoi(frameNum.c_str());
+        vstrImageFilenames.at(frameInt)=output;
+    }
+    closedir(dir);
+}
+
+
+//high precision time in seconds since epoch
+static double getTimeSinceEpoch(std::chrono::high_resolution_clock::time_point* t = nullptr)
+{
+    using Clock = std::chrono::high_resolution_clock;
+    return std::chrono::duration<double>((t != nullptr ? *t : Clock::now() ).time_since_epoch()).count();
+}
+
+
 
 int main(int argc, char **argv)
 {
@@ -46,10 +124,10 @@ int main(int argc, char **argv)
 
     // Retrieve paths to images
     vector<string> vstrImageFilenames;
-    vector<double> vTimestamps;
-    LoadImages(string(argv[3]), vstrImageFilenames, vTimestamps);
+    LoadImages(string(argv[3]), vstrImageFilenames );
 
     int nImages = vstrImageFilenames.size();
+    std::cout<<"check number of images: "<<nImages<<std::endl;
 
     // Create SLAM system. It initializes all system threads and gets ready to process frames.
     ORB_SLAM2::System SLAM(argv[1],argv[2],ORB_SLAM2::System::MONOCULAR,true);
@@ -68,7 +146,9 @@ int main(int argc, char **argv)
     {
         // Read image from file
         im = cv::imread(vstrImageFilenames[ni],CV_LOAD_IMAGE_UNCHANGED);
-        double tframe = vTimestamps[ni];
+
+
+        double tframe = getTimeSinceEpoch();
 
         if(im.empty())
         {
@@ -93,17 +173,11 @@ int main(int argc, char **argv)
 
         double ttrack= std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count();
 
-        vTimesTrack[ni]=ttrack;
+
 
         // Wait to load the next frame
         double T=0;
-        if(ni<nImages-1)
-            T = vTimestamps[ni+1]-tframe;
-        else if(ni>0)
-            T = tframe-vTimestamps[ni-1];
-
-        if(ttrack<T)
-            usleep((T-ttrack)*1e6);
+        usleep(1000000);
     }
 
     // Stop all threads
@@ -124,36 +198,4 @@ int main(int argc, char **argv)
     SLAM.SaveKeyFrameTrajectoryTUM("KeyFrameTrajectory.txt");    
 
     return 0;
-}
-
-void LoadImages(const string &strPathToSequence, vector<string> &vstrImageFilenames, vector<double> &vTimestamps)
-{
-    ifstream fTimes;
-    string strPathTimeFile = strPathToSequence + "/times.txt";
-    fTimes.open(strPathTimeFile.c_str());
-    while(!fTimes.eof())
-    {
-        string s;
-        getline(fTimes,s);
-        if(!s.empty())
-        {
-            stringstream ss;
-            ss << s;
-            double t;
-            ss >> t;
-            vTimestamps.push_back(t);
-        }
-    }
-
-    string strPrefixLeft = strPathToSequence + "/image_0/";
-
-    const int nTimes = vTimestamps.size();
-    vstrImageFilenames.resize(nTimes);
-
-    for(int i=0; i<nTimes; i++)
-    {
-        stringstream ss;
-        ss << setfill('0') << setw(6) << i;
-        vstrImageFilenames[i] = strPrefixLeft + ss.str() + ".png";
-    }
 }

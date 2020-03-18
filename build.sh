@@ -3,7 +3,7 @@ echo "Configuring and building Thirdparty/DBoW2 ..."
 cd Thirdparty/DBoW2
 mkdir build
 cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
+cmake .. -DCMAKE_BUILD_TYPE=Release -DOpenCV_DIR=~/Externals/install/opencv/share/OpenCV/
 make -j
 
 cd ../../g2o
@@ -27,5 +27,5 @@ echo "Configuring and building ORB_SLAM2 ..."
 
 mkdir build
 cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
+cmake .. -DCMAKE_BUILD_TYPE=Release -DOpenCV_DIR=~/Externals/install/opencv/share/OpenCV/
 make -j

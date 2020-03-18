@@ -27,7 +27,9 @@
 #include<opencv2/core/core.hpp>
 
 #include<System.h>
-
+#include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
 using namespace std;
 
 void LoadImages(const string &strImagePath, const string &strPathTimes,
